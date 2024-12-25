@@ -18,6 +18,8 @@ var maxHex uint64 = 128
 var yaraPath string = "./tools/yara64.exe"
 var yaraCompilerPath string = "./tools/yarac64.exe"
 
+var rulesPath string = "./rules/compiled"
+
 type Yara struct {
 	sync.Mutex
 	Path        string
@@ -27,6 +29,16 @@ type Yara struct {
 	Size        uint64
 	Threats     []Threat
 	ScanProcess bool
+}
+
+func init() {
+	// register as a scanner
+	var yara = &Yara{}
+	scanners = append(scanners, yara)
+}
+
+func (y *Yara) GetThreats() []Threat {
+	return y.Threats
 }
 
 func (t *Threat) Print() {
@@ -69,7 +81,11 @@ func compiledToRule(compiledPath string) (string, error) {
 	return tar, nil
 }
 
-func (y *Yara) Init(path string, rulesPath string) error {
+func (y *Yara) Name() string {
+	return "Yara"
+}
+
+func (y *Yara) Init(path string) error {
 	var err error
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return errors.New("file not found")

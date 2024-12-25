@@ -3,7 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/garethjensen/amsi"
 )
@@ -15,15 +18,47 @@ type AMSI struct {
 	Threat Threat
 }
 
+func init() {
+	var amsi = &AMSI{}
+	scanners = append(scanners, amsi)
+}
+
+func (a *AMSI) GetThreats() []Threat {
+	return []Threat{a.Threat}
+}
+
+func (a *AMSI) Name() string {
+	return "AMSI"
+}
+
+func (a *AMSI) Cleanup() {
+	// no cleanup needed
+}
+
 func (a *AMSI) Init(path string) error {
+	log.Printf("Scanning %s with %s\n", path, a.Name())
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return errors.New("file not found")
 	}
 	a.Path = path
 	var err error
-	a.Bin, err = os.ReadFile(path)
-	if err != nil {
-		return err
+	// loop until file is not in use
+	for {
+		a.Bin, err = os.ReadFile(path)
+		if err != nil {
+			if strings.Contains(err.Error(), "used by another process") {
+				log.Println("File in use, retrying in 1 second")
+				// wait 1 second
+				time.Sleep(1 * time.Second)
+				// unset err
+				err = nil
+				continue
+			} else {
+				return err
+			}
+		} else {
+			break
+		}
 	}
 	a.Size = uint64(len(a.Bin))
 	return nil

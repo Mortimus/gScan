@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -21,6 +22,9 @@ func init() {
 	if err != nil {
 		log.Fatal("Error:", err)
 	}
+	// register as a scanner
+	var defender = &Defender{}
+	scanners = append(scanners, defender)
 }
 
 // Check if folder is whitelisted at HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths
@@ -86,15 +90,38 @@ type Defender struct {
 	Threat     Threat
 }
 
+func (d Defender) Name() string {
+	return "Microsoft Defender"
+}
+
+func (d *Defender) GetThreats() []Threat {
+	return []Threat{d.Threat}
+}
+
 func (d *Defender) Init(path string) error {
+	log.Printf("Scanning %s with %s\n", path, d.Name())
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return errors.New("file not found")
 	}
 	d.Path = path
 	var err error
-	d.Bin, err = os.ReadFile(path)
-	if err != nil {
-		return err
+	// loop until file is not in use
+	for {
+		d.Bin, err = os.ReadFile(path)
+		if err != nil {
+			if strings.Contains(err.Error(), "used by another process") {
+				log.Println("File in use, retrying in 1 second")
+				// wait 1 second
+				time.Sleep(1 * time.Second)
+				// unset err
+				err = nil
+				continue
+			} else {
+				return err
+			}
+		} else {
+			break
+		}
 	}
 	d.Size = uint64(len(d.Bin))
 	d.TempFolder, err = os.MkdirTemp(".", "malware")
@@ -104,7 +131,7 @@ func (d *Defender) Init(path string) error {
 	return nil
 }
 
-func (d *Defender) Cleanup() {
+func (d Defender) Cleanup() {
 	// log.Printf("Cleaning up %s", d.TempFolder)
 	err := os.RemoveAll(d.TempFolder)
 	if err != nil {

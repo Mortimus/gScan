@@ -15,6 +15,7 @@ package main
 import (
 	"encoding/hex"
 	"errors"
+	"flag"
 	"fmt"
 	"html/template"
 	"log"
@@ -30,10 +31,18 @@ import (
 
 // Folder that is whitelisted and monitored for new files
 var detonateFolder string = "./detonate"
+var scanners []Scanner
 
 func main() {
 	var compileYaraRules bool
-	compileYaraRules = false
+	// using the flag package to parse command line arguments
+	// select the folder to monitor
+	flag.StringVar(&detonateFolder, "d", "./detonate", "Folder that is whitelisted and monitored for new files")
+	// set the max number of threads
+	flag.IntVar(&maxThreads, "t", 50, "Max number of threads to use")
+	// should we compile the yara rules
+	flag.BoolVar(&compileYaraRules, "c", false, "Compile Yara rules")
+	flag.Parse()
 	if compileYaraRules {
 		fmt.Printf("Compiling Yara rules...\n")
 		// Compile Rules
@@ -101,21 +110,7 @@ func main() {
 					// time.Sleep(2 * time.Second) // TODO: this is bad, we should check if the file is still being written
 					err := malware.Scan()
 					if err != nil {
-						// if error is file in use rescan
-						if strings.Contains(err.Error(), "used by another process") {
-							// loop until file is not in use sleeping 1 second between checks
-							for {
-								log.Println("File in use, retrying in 1 second")
-								time.Sleep(1 * time.Second)
-								err = malware.Scan()
-								if err == nil {
-									break
-								}
-							}
-						} else {
-							// if error scanning file, log it
-							log.Println("Error scanning file:", err)
-						}
+						log.Println("Error scanning file:", err)
 					}
 					if malware.Malicious {
 						log.Println("Malicious file detected: ", event.Name)
@@ -164,89 +159,29 @@ func (m *Malware) Scan() error {
 		m.Malicious = false
 		return errors.New("file is empty")
 	}
-	// Scan with Defender
-	{
-		log.Printf("Scanning %s with Windows Defender...", m.Path)
+	for _, scanner := range scanners {
 		start := time.Now()
-		var defender Defender
-		err = defender.Init(m.Path)
+		err = scanner.Init(m.Path)
 		if err != nil {
-			return err
+			log.Printf("Error initializing %s: %s", scanner.Name(), err)
+			continue
 		}
-		defer defender.Cleanup()
-		err = defender.ScanAndSplit()
+		err = scanner.ScanAndSplit()
 		if err != nil {
-			return err
+			fmt.Printf("Error scanning %s: %s\n", scanner.Name(), err)
+			continue
 		}
-		if defender.Threat.Name != "" { // Threat Found
-			m.Malicious = true
-			// defender.Threat.Print()
-			threats = append(threats, defender.Threat)
-		}
-		elapsed := time.Since(start)
-		log.Printf("Scan took %s", elapsed)
-	}
-	// Scan with AMSI
-	{
-		log.Printf("Scanning %s with AMSI...", m.Path)
-		start := time.Now()
-		var amsi AMSI
-		err = amsi.Init(m.Path)
-		if err != nil {
-			return err
-		}
-		err = amsi.ScanAndSplit()
-		if err != nil {
-			return err
-		}
-		if amsi.Threat.Name != "" { // Threat Found
-			m.Malicious = true
-			// amsi.Threat.Print()
-			threats = append(threats, amsi.Threat)
-		}
-		elapsed := time.Since(start)
-		log.Printf("Scan took %s", elapsed)
-	}
-	// Scan with Yara static file
-	{
-		// log.Printf("Scanning %s with Yara rules...", m.Path)
-		start := time.Now()
-		var yara Yara
-		err = yara.Init(m.Path, "./rules/compiled")
-		if err != nil {
-			return err
-		}
-		defer yara.Cleanup()
-		err = yara.ScanAndSplit()
-		if err != nil {
-			return err
-		}
-		for _, threat := range yara.Threats {
+		for _, threat := range scanner.GetThreats() {
 			if threat.Name != "" { // Threat Found
 				m.Malicious = true
-				// yara.Threat.Print()
+				// scanner.Threat.Print()
 				threats = append(threats, threat)
 			}
 		}
+		scanner.Cleanup() // dont defer since we want to cleanup right after a scanner finishes
 		elapsed := time.Since(start)
-		log.Printf("Scan took %s", elapsed)
+		log.Printf("%s scan took %s", scanner.Name(), elapsed)
 	}
-	// start PCAP capture
-	// start Eventlogs capture
-	// start Registry capture
-	// start common directories capture
-
-	// Scan with Yara running process
-
-	// Scan with BestEDROnTheMarket
-
-	// Scan pcap file
-
-	// Scan EventLogs
-
-	// Scan Registry
-
-	// Scan common directories
 
 	// Generate report
 	if len(threats) > 0 {
@@ -282,6 +217,8 @@ type Scanner interface {
 	Cleanup()
 	Scan(low, high uint64) (Threat, error)
 	ScanAndSplit() error
+	GetThreats() []Threat
+	Name() string
 }
 
 // GenerateMarkdown creates a markdown file using a template from a file.
