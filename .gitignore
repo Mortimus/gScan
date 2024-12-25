@@ -25,9 +25,4 @@ go.work.sum
 .env
 
 # temp files
-rules/source/*
-rules/compiled/*
-tools/*
 malware*/*
-reports/*
-detonate/*
