@@ -1,4 +1,7 @@
 # [{{.Filename}}]({{.Path}})
+> Date: `{{.Date}}`
+> Size: `{{.FileSize}}`
+> SHA256: `{{.Sha256}}`
 
 {{ range .Threats }}
 

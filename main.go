@@ -1,5 +1,7 @@
 package main
 
+// TODO: Add logging to logs folder
+
 // Objectives
 // Check if detonate folder is whitelisted by defender
 // monitor detonate folder for new files
@@ -13,6 +15,7 @@ package main
 // if it is malicious, create a report and store it in the report folder
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -199,6 +202,9 @@ func (m *Malware) Scan() error {
 type MarkdownData struct {
 	Filename string
 	Path     string
+	Sha256   string
+	FileSize string
+	Date     string
 	Threats  []Threat
 }
 
@@ -242,12 +248,27 @@ func GenerateMarkdown(threats ...Threat) error {
 		return err
 	}
 	defer file.Close()
-
+	// get sha256 of path
+	// read source into memory
+	bin, err := os.ReadFile(threats[0].Source)
+	if err != nil {
+		return err
+	}
+	sha256 := sha256.Sum256(bin)
+	// get file size
+	fileInfo, err := os.Stat(threats[0].Source)
+	if err != nil {
+		return err
+	}
+	fileSize := strconv.FormatInt(fileInfo.Size(), 10)
 	// Create the data to pass to the template
 	path := strings.ReplaceAll(threats[0].Source, "\\", "/")
 	data := MarkdownData{
 		Filename: filepath.Base(threats[0].Source),
 		Path:     path,
+		Sha256:   fmt.Sprintf("%x", sha256),
+		FileSize: fileSize,
+		Date:     time.Now().Format("2006-01-02 15:04:05"),
 		Threats:  threats,
 	}
 
