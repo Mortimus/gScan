@@ -207,6 +207,7 @@ type Threat struct {
 	Scanner       string
 	Source        string
 	Reference     string
+	ReferenceName string
 	ReferencePath string
 	Low           string // uint64 to hex string
 	Bytes         string // hex.dump of []byte
@@ -243,9 +244,10 @@ func GenerateMarkdown(threats ...Threat) error {
 	defer file.Close()
 
 	// Create the data to pass to the template
+	path := strings.ReplaceAll(threats[0].Source, "\\", "/")
 	data := MarkdownData{
 		Filename: filepath.Base(threats[0].Source),
-		Path:     threats[0].Source,
+		Path:     path,
 		Threats:  threats,
 	}
 

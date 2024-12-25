@@ -87,6 +87,11 @@ func (y *Yara) Name() string {
 
 func (y *Yara) Init(path string) error {
 	var err error
+	// check if yara is installed
+	if _, err := os.Stat(yaraPath); os.IsNotExist(err) {
+		return errors.New("download yara64.exe and place it in the tools folder")
+	}
+
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return errors.New("file not found")
 	}
@@ -137,6 +142,10 @@ func (y *Yara) LoadCompiledRules() error {
 }
 
 func compileRules(sourcePath, compilePath string) error {
+	// check if yarac64.exe is installed
+	if _, err := os.Stat(yaraCompilerPath); os.IsNotExist(err) {
+		return errors.New("download yarac64.exe and place it in the tools folder")
+	}
 	// load rules from the rulesPath into the rules slice
 	// walk rulesPath and load each .yar file into the rules slice
 	sourceFiles := ".yar"    // Yara file
@@ -191,12 +200,12 @@ func yaraOutputToThreat(output, rule, fullpath string, low, high uint64, data []
 	}
 	threatname := outs[0][:threatLength]
 	// get source rule
-	ref, err := RuleToString(rule)
-	if err != nil {
-		return Threat{}, err
-		// fmt.Printf("Error getting rule: %s\n", err)
-		// return threat, err
-	}
+	// ref, err := RuleToString(rule)
+	// if err != nil {
+	// 	return Threat{}, err
+	// 	// fmt.Printf("Error getting rule: %s\n", err)
+	// 	// return threat, err
+	// }
 	refPath, err := compiledToRule(rule)
 	if err != nil {
 		return Threat{}, err
@@ -213,11 +222,14 @@ func yaraOutputToThreat(output, rule, fullpath string, low, high uint64, data []
 	if (hexEnd - hexTarget) > maxHex {
 		hexEnd = hexTarget + maxHex
 	}
+	refName := filepath.Base(refPath)
+	refPath = strings.ReplaceAll(refPath, "\\", "/")
 	threat := Threat{
 		Name:          threatname,
 		Scanner:       "Yara",
 		Source:        fullpath,
-		Reference:     ref,
+		Reference:     "",
+		ReferenceName: refName,
 		ReferencePath: refPath,
 		Low:           fmt.Sprintf("%08X", low),
 		Bytes:         HexDump(hexTarget, data[hexTarget:hexEnd]),

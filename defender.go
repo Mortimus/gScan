@@ -181,6 +181,7 @@ func (d *Defender) Scan(low, high uint64) (threat Threat, err error) {
 			Name:          extractThreat(stdOut),
 			Scanner:       "Microsoft Defender",
 			Source:        d.Path,
+			ReferenceName: "",
 			ReferencePath: "https://www.microsoft.com/en-us/wdsi/definitions",
 			Low:           fmt.Sprintf("%08X", low),
 			Bytes:         HexDump(low, d.Bin[low:high]),

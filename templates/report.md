@@ -1,4 +1,5 @@
 # [{{.Filename}}]({{.Path}})
+
 {{ range .Threats }}
 
 ## {{.Scanner}}
@@ -9,14 +10,12 @@
 {{.Bytes}}
 ```
 
-{{ if .Reference }}
+[{{$.Filename}}]({{$.Path}})
+{{ if .ReferenceName }}
+
 ### Reference
 
-```yaml
-{{.Reference}}
-```
-
-^{{.ReferencePath}}^
+[{{.ReferenceName}}]({{.ReferencePath}})
 {{ end }}
 
 ---
