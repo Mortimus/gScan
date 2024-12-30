@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/saferwall/pe"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -189,7 +190,17 @@ func (m *Malware) Scan() error {
 	// Generate report
 	if len(threats) > 0 {
 		fmt.Printf("Generating report for %s\n", m.Path)
-		err = GenerateMarkdown(threats...)
+		// get extension
+		extension := filepath.Ext(m.Path)
+		var pedata *pe.File
+		// get pe data if it is an exe or dll
+		if extension == ".exe" || extension == ".dll" {
+			pedata, err = getPEData(m.Path)
+			if err != nil {
+				return err
+			}
+		}
+		err = GenerateMarkdown(pedata, threats...)
 		if err != nil {
 			fmt.Printf("Error generating report: %s\n", err)
 			return err
@@ -205,6 +216,7 @@ type MarkdownData struct {
 	Sha256   string
 	FileSize string
 	Date     string
+	PeData   *pe.File
 	Threats  []Threat
 }
 
@@ -229,7 +241,7 @@ type Scanner interface {
 }
 
 // GenerateMarkdown creates a markdown file using a template from a file.
-func GenerateMarkdown(threats ...Threat) error {
+func GenerateMarkdown(pedata *pe.File, threats ...Threat) error {
 	templateFile := "./templates/report.md"
 	// Parse the template from the file
 	tmpl, err := template.ParseFiles(templateFile)
@@ -269,6 +281,7 @@ func GenerateMarkdown(threats ...Threat) error {
 		Sha256:   fmt.Sprintf("%x", sha256),
 		FileSize: fileSize,
 		Date:     time.Now().Format("2006-01-02 15:04:05"),
+		PeData:   pedata,
 		Threats:  threats,
 	}
 

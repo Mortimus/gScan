@@ -23,3 +23,28 @@
 
 ---
 {{ end }}
+
+{{ if .PeData }}
+## PE Data
+
+> Signed: {{.PeData.IsSigned}}
+> IAT: {{.PeData.HasIAT}}
+> Delayed Imports: {{.PeData.HasDelayImp}}
+
+### Import Address Table (IAT)
+
+```json
+{{range .PeData.IAT}}
+{{.Meaning}}
+{{end}}
+```
+
+### Delayed Imports
+
+```json
+{{range .PeData.DelayImports}}
+{{.Name}}
+{{end}}
+```
+
+{{end}}
